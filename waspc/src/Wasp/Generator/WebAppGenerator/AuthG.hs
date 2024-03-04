@@ -39,7 +39,7 @@ genOAuthCodeExchange :: AS.Auth.Auth -> Generator FileDraft
 genOAuthCodeExchange auth =
   return $
     C.mkTmplFdWithData
-      [relfile|src/auth/pages/OAuthCodeExchange.jsx|]
+      [relfile|src/auth/pages/OAuthCallback.tsx|]
       ( object
           [ "onAuthSucceededRedirectTo" .= getOnAuthSucceededRedirectToOrDefault auth,
             "onAuthFailedRedirectTo" .= AS.Auth.onAuthFailedRedirectTo auth

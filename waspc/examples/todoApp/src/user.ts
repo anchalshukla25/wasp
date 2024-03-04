@@ -1,4 +1,4 @@
-import { getEmail, findUserIdentity, type AuthUser as User } from "wasp/auth";
+import { getEmail, findUserIdentity, type AuthUser as User } from 'wasp/auth'
 
 export function getName(user?: User) {
   if (!user) {
@@ -14,6 +14,11 @@ export function getName(user?: User) {
   const googleIdentity = findUserIdentity(user, 'google')
   if (googleIdentity) {
     return `Google user ${googleIdentity.providerUserId}`
+  }
+
+  const githubIdentity = findUserIdentity(user, 'github')
+  if (githubIdentity) {
+    return `GitHub user ${githubIdentity.providerUserId}`
   }
 
   // If we don't know how to get the name, return null.

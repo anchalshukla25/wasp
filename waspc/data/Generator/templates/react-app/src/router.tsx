@@ -14,7 +14,7 @@ import createAuthRequiredPage from "./auth/pages/createAuthRequiredPage"
 {=/ pagesToImport =}
 
 {=# isExternalAuthEnabled =}
-import OAuthCodeExchange from "./auth/pages/OAuthCodeExchange"
+import { OAuthCallbackPage } from "./auth/pages/OAuthCallback"
 {=/ isExternalAuthEnabled =}
 
 import { routes } from 'wasp/client/router'
@@ -42,8 +42,8 @@ const router = (
       {=# isExternalAuthEnabled =}
       {=# externalAuthProviders =}
       {=# authProviderEnabled =}
-      <Route exact path="{= authFrontendUrl =}">
-        <OAuthCodeExchange pathToApiServerRouteHandlingOauthRedirect="{= authServerOauthRedirectUrl =}" />
+      <Route exact path="/oauth/callback">
+        <OAuthCallbackPage />
       </Route>
       {=/ authProviderEnabled =}
       {=/ externalAuthProviders =}
