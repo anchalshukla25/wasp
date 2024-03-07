@@ -113,7 +113,7 @@ const _waspConfig: ProviderConfig = {
             });
             const providerProfile = (await response.json()) as {
                 id?: string;
-                emails?: GithubEmail[];
+                emails?: unknown[];
             };
             
             if (!providerProfile.id) {
@@ -131,7 +131,7 @@ const _waspConfig: ProviderConfig = {
                         Authorization: `Bearer ${accessToken}`,
                     },
                 });
-                const emails = (await emailsResponse.json()) as GithubEmail[];
+                const emails = (await emailsResponse.json()) as unknown[];
                 providerProfile.emails = emails;
             }
 
@@ -141,10 +141,5 @@ const _waspConfig: ProviderConfig = {
         return router;
     },
 }
-
-type GithubEmail = {
-    email: string;
-    primary: boolean;
-};
 
 export default _waspConfig;
