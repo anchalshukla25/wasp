@@ -3,6 +3,7 @@ import { Router, Request as ExpressRequest } from "express";
 import { Google, generateCodeVerifier, generateState } from "arctic";
 
 import { HttpError } from 'wasp/server';
+import { handleRejection } from "wasp/server/utils";
 import type { ProviderConfig } from "wasp/auth/providers/types";
 import { callbackPath, getRedirectUriForCallback } from "../oauth/redirect.js";
 import { finishOAuthFlowAndGetRedirectUri } from "../oauth/user.js";
@@ -42,7 +43,11 @@ const _waspConfig: ProviderConfig = {
             getRedirectUriForCallback(provider.id)
         );
 
-        router.get('/login', async (_req, res) => {
+        const config = mergeDefaultAndUserConfig({
+            scopes: {=& requiredScopes =},
+        }, _waspUserDefinedConfigFn);
+
+        router.get('/login', handleRejection(async (_req, res) => {
             const state = generateState();
             setValueInCookie(getStateCookieName(provider.id), state, res);
 
@@ -53,16 +58,13 @@ const _waspConfig: ProviderConfig = {
                 res
             );
 
-            const config = mergeDefaultAndUserConfig({
-                scopes: {=& requiredScopes =},
-            }, _waspUserDefinedConfigFn);
             const url = await google.createAuthorizationURL(state, codeVerifier, config);
             return res.status(302)
                 .setHeader("Location", url.toString())
                 .end();
-        });
+        }));
 
-        router.get(`/${callbackPath}`, async (req, res) => {
+        router.get(`/${callbackPath}`, handleRejection(async (req, res) => {
             try {
                 const { code, codeVerifier } = getDataFromCallback(req);
                 const { accessToken } = await google.validateAuthorizationCode(code, codeVerifier);
@@ -85,7 +87,7 @@ const _waspConfig: ProviderConfig = {
                 // TODO: it makes sense to redirect to the client with the OAuth erorr!
                 throw new HttpError(500, "Something went wrong");
             }
-        });
+        }));
 
         function getDataFromCallback(req: ExpressRequest): {
             code: string;
@@ -133,19 +135,15 @@ const _waspConfig: ProviderConfig = {
                     },
                 }
             );
-            // TODO: make this specific for Google
             const providerProfile = (await response.json()) as {
-                id?: string;
                 sub?: string;
             };
-    
-            const providerUserId = providerProfile.sub ?? providerProfile.id;
-    
-            if (!providerUserId) {
+        
+            if (!providerProfile.sub) {
                 throw new Error("Invalid profile");
             }
 
-            return { providerProfile, providerUserId };
+            return { providerProfile, providerUserId: providerProfile.sub };
         }
 
         return router;

@@ -1,7 +1,7 @@
 export function config() {
   console.log('Inside user-supplied Google config')
   return {
-    scope: ['profile', 'email'],
+    scopes: ['profile', 'email'],
   }
 }
 
