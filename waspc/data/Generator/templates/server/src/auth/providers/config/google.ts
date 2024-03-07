@@ -2,6 +2,7 @@
 import { Router, Request as ExpressRequest } from "express";
 import { Google, generateCodeVerifier, generateState } from "arctic";
 
+import { HttpError } from 'wasp/server';
 import type { ProviderConfig } from "wasp/auth/providers/types";
 import { callbackPath, getRedirectUriForCallback } from "../oauth/redirect.js";
 import { finishOAuthFlowAndGetRedirectUri } from "../oauth/user.js";
@@ -83,10 +84,7 @@ const _waspConfig: ProviderConfig = {
                 console.error(e);
         
                 // TODO: it makes sense to redirect to the client with the OAuth erorr!
-                return res.status(500).json({
-                    success: false,
-                    message: "Something went wrong",
-                });
+                throw new HttpError(500, "Something went wrong");
             }
         });
 
