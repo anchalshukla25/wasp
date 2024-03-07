@@ -44,17 +44,19 @@ const _waspConfig: ProviderConfig = {
 
         router.get('/login', async (_req, res) => {
             const state = generateState();
-            const codeVerifier = generateCodeVerifier();
-            const config = mergeDefaultAndUserConfig({
-                scopes: {=& requiredScopes =},
-            }, _waspUserDefinedConfigFn);
-            const url = await google.createAuthorizationURL(state, codeVerifier, config);
             setValueInCookie(getStateCookieName(provider.id), state, res);
+
+            const codeVerifier = generateCodeVerifier();
             setValueInCookie(
                 getCodeVerifierCookieName(provider.id),
                 codeVerifier,
                 res
             );
+
+            const config = mergeDefaultAndUserConfig({
+                scopes: {=& requiredScopes =},
+            }, _waspUserDefinedConfigFn);
+            const url = await google.createAuthorizationURL(state, codeVerifier, config);
             return res.status(302)
                 .setHeader("Location", url.toString())
                 .end();
@@ -63,10 +65,7 @@ const _waspConfig: ProviderConfig = {
         router.get(`/${callbackPath}`, async (req, res) => {
             try {
                 const { code, codeVerifier } = getDataFromCallback(req);
-                const { accessToken } = await google.validateAuthorizationCode(
-                    code,
-                    codeVerifier,
-                );
+                const { accessToken } = await google.validateAuthorizationCode(code, codeVerifier);
                 const { providerProfile, providerUserId } = await getGoogleProfile(accessToken);
                 const { redirectUri } =  await finishOAuthFlowAndGetRedirectUri(
                     provider,

@@ -43,11 +43,12 @@ const _waspConfig: ProviderConfig = {
 
         router.get('/login', async (_req, res) => {
             const state = generateState();
+            setValueInCookie(getStateCookieName(provider.id), state, res);
+
             const config = mergeDefaultAndUserConfig({
                 scopes: {=& requiredScopes =},
             }, _waspUserDefinedConfigFn);
             const url = await github.createAuthorizationURL(state, config);
-            setValueInCookie(getStateCookieName(provider.id), state, res);
             return res.status(302)
                 .setHeader("Location", url.toString())
                 .end();
