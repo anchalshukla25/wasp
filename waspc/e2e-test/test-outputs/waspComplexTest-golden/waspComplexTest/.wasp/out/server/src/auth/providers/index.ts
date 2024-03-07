@@ -1,9 +1,9 @@
 import { Router } from "express";
 
-import google from './config/google.js'
+import __userDefinedGoogle from './config/google.js'
 
 const providers = [
-  google,
+  __userDefinedGoogle,
 ];
 
 const router = Router();
