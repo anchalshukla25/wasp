@@ -1,13 +1,11 @@
 {{={= =}=}}
-import { Router } from "express";
+import { Router, Request as ExpressRequest } from "express";
 import { Google, generateCodeVerifier, generateState } from "arctic";
 
 import type { ProviderConfig } from "wasp/auth/providers/types";
-import { createProviderId } from 'wasp/auth/utils'
-import { callbackPath, getRedirectUriForCallback, getRedirectUriForOneTimeCode } from "../oauth/redirect.js";
-import { getAuthIdFromProviderDetails } from "../oauth/user.js";
+import { callbackPath, getRedirectUriForCallback } from "../oauth/redirect.js";
+import { finishOAuthFlowAndGetRedirectUri } from "../oauth/user.js";
 import { getCodeVerifierCookieName, getStateCookieName, getValueFromCookie, setValueInCookie } from "../oauth/cookies.js";
-import { tokenStore } from "../oauth/oneTimeCode.js";
 
 {=# userSignupFields.isDefined =}
 {=& userSignupFields.importStatement =}
@@ -50,10 +48,46 @@ const _waspConfig: ProviderConfig = {
                 codeVerifier,
                 res
             );
-            return res.status(302).setHeader("Location", url.toString()).end();
-        })
+            return res.status(302)
+                .setHeader("Location", url.toString())
+                .end();
+        });
 
         router.get(`/${callbackPath}`, async (req, res) => {
+            try {
+                const { code, codeVerifier } = getDataFromCallback(req);
+                const { accessToken } = await google.validateAuthorizationCode(
+                    code,
+                    codeVerifier,
+                );
+                const { providerProfile, providerUserId } = await getGoogleProfile(accessToken);
+                const { redirectUri } =  await finishOAuthFlowAndGetRedirectUri(
+                    provider,
+                    providerProfile,
+                    providerUserId,
+                    _waspUserDefinedConfigFn,
+                );
+
+                return res
+                    .status(302)
+                    .setHeader("Location", redirectUri)
+                    .end();
+            } catch (e) {
+                // TODO: handle different errors
+                console.error(e);
+        
+                // TODO: it makes sense to redirect to the client with the OAuth erorr!
+                return res.status(500).json({
+                    success: false,
+                    message: "Something went wrong",
+                });
+            }
+        });
+
+        function getDataFromCallback(req: ExpressRequest): {
+            code: string;
+            codeVerifier: string;
+        } {
             const storedState = getValueFromCookie(
                 getStateCookieName(provider.id),
                 req
@@ -71,75 +105,45 @@ const _waspConfig: ProviderConfig = {
                 storedState !== state ||
                 typeof code !== "string"
             ) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Invalid state",
-                });
+                throw new Error("Invalid state");
             }
         
             if (!storedCodeVerifier) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Invalid code verifier",
-                });
+                throw new Error("Invalid code verifier");
             }
-        
-            try {
-                const { accessToken } = await google.validateAuthorizationCode(
-                    code,
-                    storedCodeVerifier
-                );
-        
-                const response = await fetch(
-                    "https://openidconnect.googleapis.com/v1/userinfo",
-                    {
-                        headers: {
-                            Authorization: `Bearer ${accessToken}`,
-                        },
-                    }
-                );
-                const providerProfile = (await response.json()) as {
-                    id?: string;
-                    sub?: string;
-                };
-        
-                const providerUserId = providerProfile.sub ?? providerProfile.id;
-        
-                if (!providerUserId) {
-                    return res.status(500).json({
-                        success: false,
-                        message: "Something went wrong",
-                    });
+
+            return {
+                code,
+                codeVerifier: storedCodeVerifier,
+            }
+        }
+
+        async function getGoogleProfile(accessToken: string): Promise<{
+            providerProfile: unknown;
+            providerUserId: string;
+        }> {
+            const response = await fetch(
+                "https://openidconnect.googleapis.com/v1/userinfo",
+                {
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                    },
                 }
-
-                const providerId = createProviderId(provider.id, providerUserId);
-
-                const authId = await getAuthIdFromProviderDetails(providerId, providerProfile, _waspUserSignupFields)
+            );
+            // TODO: make this specific for Google
+            const providerProfile = (await response.json()) as {
+                id?: string;
+                sub?: string;
+            };
     
-                if (!authId) {
-                    return res.status(500).json({
-                        success: false,
-                        message: "Something went wrong",
-                    });
-                }
-        
-                const oneTimeCode = await tokenStore.createToken(authId);
-
-                // Redirect to the client with the one time code
-                return res
-                    .status(302)
-                    .setHeader("Location", getRedirectUriForOneTimeCode(oneTimeCode))
-                    .end();
-            } catch (e) {
-                // TODO: handle different errors
-                console.error(e);
-        
-                return res.status(500).json({
-                    success: false,
-                    message: "Something went wrong",
-                });
+            const providerUserId = providerProfile.sub ?? providerProfile.id;
+    
+            if (!providerUserId) {
+                throw new Error("Invalid profile");
             }
-        })
+
+            return { providerProfile, providerUserId };
+        }
 
         return router;
     },

@@ -1,13 +1,11 @@
 {{={= =}=}}
-import { Router } from "express";
+import { Router, Request as ExpressRequest } from "express";
 import { GitHub, generateState } from "arctic";
 
 import type { ProviderConfig } from "wasp/auth/providers/types";
-import { createProviderId } from 'wasp/auth/utils'
-import { getAuthIdFromProviderDetails } from "../oauth/user.js";
+import { finishOAuthFlowAndGetRedirectUri } from "../oauth/user.js";
 import { getStateCookieName, getValueFromCookie, setValueInCookie } from "../oauth/cookies.js";
-import { tokenStore } from "../oauth/oneTimeCode.js";
-import { callbackPath, getRedirectUriForOneTimeCode } from "../oauth/redirect.js";
+import { callbackPath } from "../oauth/redirect.js";
 
 {=# userSignupFields.isDefined =}
 {=& userSignupFields.importStatement =}
@@ -23,28 +21,6 @@ const _waspUserDefinedConfigFn = {= configFn.importIdentifier =}
 {=^ configFn.isDefined =}
 const _waspUserDefinedConfigFn = undefined
 {=/ configFn.isDefined =}
-
-/*
-
-Consider introducing a helper called
-
-createRouter({
-    initAuthProvider: () => new GitHub(),
-    prepareRedirectUrl: async (req, res, provider, auth) => {},
-    getProviderProfile: async (req, res, provider, auth) => {},
-    getProviderUserId: (providerProfile) => {},
-})
-
-Or consider multilpe small helpers like
-
-setStateCookie(provider.id, state, res)
-getStateCookie(provider.id, req)
-getCodeFromQuery(req)
-validateState(storedState, state, code)
-validateCode(code)
-createAuthorizationUrl(provider, state)
-
-*/
 
 const _waspConfig: ProviderConfig = {
     id: "{= providerId =}",
@@ -65,10 +41,41 @@ const _waspConfig: ProviderConfig = {
                 scopes: {=& requiredScopes =},
             });
             setValueInCookie(getStateCookieName(provider.id), state, res);
-            return res.status(302).setHeader("Location", url.toString()).end();
-        })
+            return res.status(302)
+                .setHeader("Location", url.toString())
+                .end();
+        });
 
-        router.get(`/${callbackPath}`, async (req, res) => {
+        router.get(`/${callbackPath}`, async (req, res) => {    
+            try {
+                const { code } =  getDataFromCallback(req);
+                const { accessToken } = await github.validateAuthorizationCode(code);
+                const { providerProfile, providerUserId } = await getGithubProfile(accessToken);
+                const { redirectUri } =  await finishOAuthFlowAndGetRedirectUri(
+                    provider,
+                    providerProfile,
+                    providerUserId,
+                    _waspUserDefinedConfigFn,
+                );
+
+                // Redirect to the client with the one time code
+                return res
+                    .status(302)
+                    .setHeader("Location", redirectUri)
+                    .end();
+            } catch (e) {
+                // TODO: handle different errors
+                console.error(e);
+        
+                // TODO: it makes sense to redirect to the client with the OAuth erorr!
+                return res.status(500).json({
+                    success: false,
+                    message: "Something went wrong",
+                });
+            }
+        });
+
+        function getDataFromCallback(req: ExpressRequest): { code: string } {
             const storedState = getValueFromCookie(
                 getStateCookieName(provider.id),
                 req
@@ -82,65 +89,34 @@ const _waspConfig: ProviderConfig = {
                 storedState !== state ||
                 typeof code !== "string"
             ) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Invalid state",
-                });
+                throw new Error("Invalid state or code");
             }
-    
-            try {
-                const { accessToken } = await github.validateAuthorizationCode(code);
-    
-                // TODO: maybe an additional request to get the user's email?
-                const response = await fetch("https://api.github.com/user", {
-                    headers: {
-                        Authorization: `Bearer ${accessToken}`,
-                    },
-                });
-                const providerProfile = (await response.json()) as {
-                    id?: string;
-                    sub?: string;
-                };
 
-                console.log('providerProfile', providerProfile);
-        
-                const providerUserId = providerProfile.sub ?? providerProfile.id;
-        
-                if (!providerUserId) {
-                    return res.status(500).json({
-                        success: false,
-                        message: "Something went wrong",
-                    });
-                }
+            return { code }
+        }
 
-                const providerId = createProviderId(provider.id, `${providerUserId}`);
+        async function getGithubProfile(accessToken: string): Promise<{
+            providerProfile: unknown;
+            providerUserId: string;
+        }> {
+            // TODO: Get user's email if possible (that's how Passport did it)
+            const response = await fetch("https://api.github.com/user", {
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                },
+            });
+            const providerProfile = (await response.json()) as {
+                id?: string;
+            };
 
-                const authId = await getAuthIdFromProviderDetails(providerId, providerProfile, _waspUserSignupFields)
-    
-                if (!authId) {
-                    return res.status(500).json({
-                        success: false,
-                        message: "Something went wrong",
-                    });
-                }
-        
-                const oneTimeCode = await tokenStore.createToken(authId);
-                
-                // Redirect to the client with the one time code
-                return res
-                    .status(302)
-                    .setHeader("Location", getRedirectUriForOneTimeCode(oneTimeCode))
-                    .end();
-            } catch (e) {
-                // TODO: handle different errors
-                console.error(e);
-        
-                return res.status(500).json({
-                    success: false,
-                    message: "Something went wrong",
-                });
+            console.log('providerProfile', providerProfile);
+            
+            if (!providerProfile.id) {
+               throw new Error("Invalid profile");
             }
-        })
+
+            return { providerProfile, providerUserId: `${providerProfile.id}` };
+        }
 
         return router;
     },
