@@ -42,19 +42,24 @@ export function OAuthCallbackPage() {
     return <Redirect to="{= onAuthSucceededRedirectTo =}" />;
   }
 
-  if (error) {
-    return (
-      /* TODO: Decide if we want to redirect to a page that shows the error message */
-      // <Redirect to={`{= onAuthFailedRedirectTo =}?error=${error}`} />
-      <div>
-        {error}
-      </div>
-    );
-  }
+  /* TODO: Decide if we want to redirect to a page that shows the error message */
+  // if (error) {
+  //   return (
+  //     <Redirect to={`{= onAuthFailedRedirectTo =}?error=${error}`} />
+  //   );
+  // }
 
   return (
-    <div>
-      {isLoading && "Spinner..."}
+    <div style={{
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: "4rem",
+    }}>
+      {error && <div style={{
+        color: "rgb(239 68 68)"
+      }}>{error}</div>}
+      {isLoading && <div>Please wait a moment while we log you in.</div>}
     </div>
   );
 }
