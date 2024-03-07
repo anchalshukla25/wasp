@@ -6,6 +6,7 @@ import type { ProviderConfig } from "wasp/auth/providers/types";
 import { finishOAuthFlowAndGetRedirectUri } from "../oauth/user.js";
 import { getStateCookieName, getValueFromCookie, setValueInCookie } from "../oauth/cookies.js";
 import { callbackPath } from "../oauth/redirect.js";
+import { ensureEnvVarsForProvider } from "../oauth/env.js";
 
 {=# userSignupFields.isDefined =}
 {=& userSignupFields.importStatement =}
@@ -28,10 +29,14 @@ const _waspConfig: ProviderConfig = {
     createRouter(provider) {
         const router = Router();
 
-        // TODO: make sure to validate the env vars
+        const env = ensureEnvVarsForProvider(
+            ["GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET"],
+            provider
+        );
+
         const github = new GitHub(
-            process.env.GITHUB_CLIENT_ID,
-            process.env.GITHUB_CLIENT_SECRET,
+            env.GITHUB_CLIENT_ID,
+            env.GITHUB_CLIENT_SECRET,
         );
 
         router.get('/login', async (_req, res) => {
@@ -55,7 +60,7 @@ const _waspConfig: ProviderConfig = {
                     provider,
                     providerProfile,
                     providerUserId,
-                    _waspUserDefinedConfigFn,
+                    _waspUserSignupFields,
                 );
 
                 // Redirect to the client with the one time code

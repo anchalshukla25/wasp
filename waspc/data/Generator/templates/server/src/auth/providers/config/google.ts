@@ -6,6 +6,7 @@ import type { ProviderConfig } from "wasp/auth/providers/types";
 import { callbackPath, getRedirectUriForCallback } from "../oauth/redirect.js";
 import { finishOAuthFlowAndGetRedirectUri } from "../oauth/user.js";
 import { getCodeVerifierCookieName, getStateCookieName, getValueFromCookie, setValueInCookie } from "../oauth/cookies.js";
+import { ensureEnvVarsForProvider } from "../oauth/env.js";
 
 {=# userSignupFields.isDefined =}
 {=& userSignupFields.importStatement =}
@@ -28,10 +29,15 @@ const _waspConfig: ProviderConfig = {
     createRouter(provider) {
         const router = Router();
 
-        // TODO: make sure to validate the env vars
+        
+        const env = ensureEnvVarsForProvider(
+            ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"],
+            provider
+        );
+
         const google = new Google(
-            process.env.GOOGLE_CLIENT_ID,
-            process.env.GOOGLE_CLIENT_SECRET,
+            env.GOOGLE_CLIENT_ID,
+            env.GOOGLE_CLIENT_SECRET,
             getRedirectUriForCallback(provider.id)
         );
 
@@ -65,7 +71,7 @@ const _waspConfig: ProviderConfig = {
                     provider,
                     providerProfile,
                     providerUserId,
-                    _waspUserDefinedConfigFn,
+                    _waspUserSignupFields,
                 );
 
                 return res

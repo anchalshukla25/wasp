@@ -50,10 +50,11 @@ genOAuthHelpers :: AS.Auth.Auth -> Generator [FileDraft]
 genOAuthHelpers auth =
   sequence
     [ genTypes auth,
+      genUser,
       return $ C.mkSrcTmplFd [relfile|auth/providers/oauth/cookies.ts|],
+      return $ C.mkSrcTmplFd [relfile|auth/providers/oauth/env.ts|],
       return $ C.mkSrcTmplFd [relfile|auth/providers/oauth/oneTimeCode.ts|],
-      return $ C.mkSrcTmplFd [relfile|auth/providers/oauth/redirect.ts|],
-      genUser
+      return $ C.mkSrcTmplFd [relfile|auth/providers/oauth/redirect.ts|]
     ]
 
 genUser :: Generator FileDraft
