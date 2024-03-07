@@ -7,6 +7,7 @@ import { callbackPath, getRedirectUriForCallback } from "../oauth/redirect.js";
 import { finishOAuthFlowAndGetRedirectUri } from "../oauth/user.js";
 import { getCodeVerifierCookieName, getStateCookieName, getValueFromCookie, setValueInCookie } from "../oauth/cookies.js";
 import { ensureEnvVarsForProvider } from "../oauth/env.js";
+import { mergeDefaultAndUserConfig } from "../oauth/config.js";
 
 {=# userSignupFields.isDefined =}
 {=& userSignupFields.importStatement =}
@@ -29,7 +30,6 @@ const _waspConfig: ProviderConfig = {
     createRouter(provider) {
         const router = Router();
 
-        
         const env = ensureEnvVarsForProvider(
             ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"],
             provider
@@ -44,10 +44,10 @@ const _waspConfig: ProviderConfig = {
         router.get('/login', async (_req, res) => {
             const state = generateState();
             const codeVerifier = generateCodeVerifier();
-            const url = await google.createAuthorizationURL(state, codeVerifier, {
-                // TODO: use the user defined config function
-                scopes: {=& requiredScopes =}
-            });
+            const config = mergeDefaultAndUserConfig({
+                scopes: {=& requiredScopes =},
+            }, _waspUserDefinedConfigFn);
+            const url = await google.createAuthorizationURL(state, codeVerifier, config);
             setValueInCookie(getStateCookieName(provider.id), state, res);
             setValueInCookie(
                 getCodeVerifierCookieName(provider.id),

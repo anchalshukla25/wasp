@@ -7,6 +7,7 @@ import { finishOAuthFlowAndGetRedirectUri } from "../oauth/user.js";
 import { getStateCookieName, getValueFromCookie, setValueInCookie } from "../oauth/cookies.js";
 import { callbackPath } from "../oauth/redirect.js";
 import { ensureEnvVarsForProvider } from "../oauth/env.js";
+import { mergeDefaultAndUserConfig } from "../oauth/config.js";
 
 {=# userSignupFields.isDefined =}
 {=& userSignupFields.importStatement =}
@@ -41,10 +42,10 @@ const _waspConfig: ProviderConfig = {
 
         router.get('/login', async (_req, res) => {
             const state = generateState();
-            const url = await github.createAuthorizationURL(state, {
-                // TODO: use the user defined config function
+            const config = mergeDefaultAndUserConfig({
                 scopes: {=& requiredScopes =},
-            });
+            }, _waspUserDefinedConfigFn);
+            const url = await github.createAuthorizationURL(state, config);
             setValueInCookie(getStateCookieName(provider.id), state, res);
             return res.status(302)
                 .setHeader("Location", url.toString())

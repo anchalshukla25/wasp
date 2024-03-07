@@ -53,6 +53,7 @@ genOAuthHelpers auth =
       genUser,
       return $ C.mkSrcTmplFd [relfile|auth/providers/oauth/cookies.ts|],
       return $ C.mkSrcTmplFd [relfile|auth/providers/oauth/env.ts|],
+      return $ C.mkSrcTmplFd [relfile|auth/providers/oauth/config.ts|],
       return $ C.mkSrcTmplFd [relfile|auth/providers/oauth/oneTimeCode.ts|],
       return $ C.mkSrcTmplFd [relfile|auth/providers/oauth/redirect.ts|]
     ]
