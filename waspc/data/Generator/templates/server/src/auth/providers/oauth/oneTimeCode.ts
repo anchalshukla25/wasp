@@ -1,5 +1,7 @@
 import { Router } from "express";
 
+import { HttpError } from 'wasp/server';
+import { handleRejection } from 'wasp/server/utils'
 import { createJWT, validateJWT, TimeSpan } from 'wasp/auth/jwt'
 import { findAuthWithUserBy } from 'wasp/auth/utils'
 import { createSession } from 'wasp/auth/session'
@@ -9,44 +11,28 @@ export const tokenStore = createTokenStore();
 export function setupOneTimeCodeRoute(router: Router) {
   router.post(
     "/exchange-code",
-    async (req, res) => {
+    handleRejection(async (req, res) => {
       const { code } = req.body;
 
-      try {
-        if (tokenStore.isUsed(code)) {
-          return res.status(400).json({
-            success: false,
-            message: "Code already used",
-          });
-        }
-
-        const { id: authId } = await tokenStore.verifyToken(code);
-        const auth = await findAuthWithUserBy({ id: authId })
-
-        if (!auth) {
-          return res.status(400).json({
-            success: false,
-            message: "Invalid code",
-          });
-        }
-
-        const session = await createSession(auth.id);
-
-        tokenStore.markUsed(code);
-
-        return res.json({
-          success: true,
-          sessionId: session.id,
-        });
-      } catch (e) {
-        console.error(e);
-
-        return res.status(500).json({
-          success: false,
-          message: "Something went wrong",
-        });
+      if (tokenStore.isUsed(code)) {
+        throw new HttpError(400, "Unable to login with the OAuth provider. The code has already been used.");
       }
-    }
+
+      const { id: authId } = await tokenStore.verifyToken(code);
+      const auth = await findAuthWithUserBy({ id: authId })
+
+      if (!auth) {
+        throw new HttpError(400, "Unable to login with the OAuth provider. The code is invalid.");
+      }
+
+      const session = await createSession(auth.id);
+
+      tokenStore.markUsed(code);
+
+      return res.json({
+        sessionId: session.id,
+      });
+    })
   );
 }
 

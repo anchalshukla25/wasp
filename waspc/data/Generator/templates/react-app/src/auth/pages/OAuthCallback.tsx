@@ -1,5 +1,4 @@
 {{={= =}=}}
-
 import { useEffect, useRef, useState } from "react";
 import { Redirect } from 'react-router-dom'
 import { useAuth } from 'wasp/client/auth'
@@ -7,36 +6,7 @@ import { api } from 'wasp/client/api'
 import { initSession } from 'wasp/auth/helpers/user'
 
 export function OAuthCallbackPage() {
-  const { data: user } = useAuth();
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  async function handleCallback() {
-    try {
-      setIsLoading(true);
-      const code = window.location.hash.slice(1);
-      const response = await exchangeOAuthCodeForToken({ code });
-      const sessionId = response.data.sessionId;
-      if (sessionId) {
-        await initSession(sessionId)
-      } else {
-        setError("Something went wrong when trying to authenticate. Please try again.");
-      }
-    } catch (e: unknown) {
-      console.error(e);
-      setError("Something went wrong when trying to authenticate. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  const isFirstRender = useRef(true);
-  useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      handleCallback();
-    }
-  }, []);
+  const { isLoading, error, user } = useOAuthCallbackHandler();
   
   if (user) {
     return <Redirect to="{= onAuthSucceededRedirectTo =}" />;
@@ -57,9 +27,48 @@ export function OAuthCallbackPage() {
   );
 }
 
+function useOAuthCallbackHandler() {
+  const { data: user } = useAuth();
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleCallback() {
+    try {
+      setIsLoading(true);
+      const code = window.location.hash.slice(1);
+      const response = await exchangeOAuthCodeForToken({ code });
+      const sessionId = response.data.sessionId;
+      if (sessionId) {
+        await initSession(sessionId)
+      } else {
+        setError("Unable to login with the OAuth provider.");
+      }
+    } catch (e: unknown) {
+      console.error(e);
+      setError("Unable to login with the OAuth provider.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      handleCallback();
+    }
+  }, []);
+
+  return {
+    user,
+    error,
+    isLoading,
+  };
+}
+
 // TODO: don't hard code the URL
-export async function exchangeOAuthCodeForToken(data: { code: string }) {
+async function exchangeOAuthCodeForToken(data: { code: string }) {
   return api.post<
-    { success: true; sessionId: string } | { success: false; message: string }
+    { sessionId: string } | { message: string }
   >(`/auth/exchange-code`, data);
 }
