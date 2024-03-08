@@ -42,13 +42,6 @@ export function OAuthCallbackPage() {
     return <Redirect to="{= onAuthSucceededRedirectTo =}" />;
   }
 
-  /* TODO: Decide if we want to redirect to a page that shows the error message */
-  // if (error) {
-  //   return (
-  //     <Redirect to={`{= onAuthFailedRedirectTo =}?error=${error}`} />
-  //   );
-  // }
-
   return (
     <div style={{
       display: "flex",
