@@ -1,6 +1,7 @@
 import { Router } from "express";
 
-import { findAuthWithUserBy, createToken, verifyToken } from 'wasp/auth/utils'
+import { createJWT, validateJWT, TimeSpan } from 'wasp/auth/jwt'
+import { findAuthWithUserBy } from 'wasp/auth/utils'
 import { createSession } from 'wasp/auth/session'
 
 export const tokenStore = createTokenStore();
@@ -52,7 +53,7 @@ export function setupOneTimeCodeRoute(router: Router) {
 function createTokenStore() {
   const usedTokens = new Map<string, number>();
 
-  const validFor = 1000 * 60; // 1 minute
+  const validFor = new TimeSpan(1, 'm') // 1 minute
   const cleanupAfter = 1000 * 60 * 60; // 1 hour
 
   function cleanUp() {
@@ -66,7 +67,7 @@ function createTokenStore() {
 
   return {
     createToken(userId: string) {
-      return createToken(
+      return createJWT(
         {
           id: userId,
         },
@@ -76,7 +77,7 @@ function createTokenStore() {
       );
     },
     verifyToken(token: string) {
-      return verifyToken<{ id: string }>(token);
+      return validateJWT<{ id: string }>(token);
     },
     isUsed(token: string) {
       return usedTokens.has(token);
